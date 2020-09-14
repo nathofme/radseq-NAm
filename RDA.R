@@ -8,15 +8,32 @@ library(psych)
 
 # load in genotypic response and environmental predictors
 # gen is vcftools 012 output, combined .012 and .012.indv files
-gen <- read.csv("EUSTallSNPr8.012.csv", header=FALSE, na.strings="-1")
-sum(is.na(gen))
-sum(!is.na(gen))
+gen <- read.csv("EUSTallSNPr8.012.csv", header=FALSE, sep="\t", na.strings="-1")
+sum(is.na(gen)) # 756766
+sum(!is.na(gen)) # 1619396
+# should be a matrix of 158x15038 (2376004 entries)
+
+missing.perSNP <- colSums(is.na(gen))
+hist(missing.perSNP)
 
 str(gen)
 
-gen.nomiss <- read.csv("EUSTallSNPr8.nomiss.012.csv", header=FALSE, na.strings="-1")
+gen.r95 <- read.csv("EUSTallSNPr95.012.csv", header=FALSE, sep="\t", na.strings="-1")
+str(gen.r95)
+sum(is.na(gen.r95)) # 11714
+sum(!is.na(gen.r95)) # 967728
+# total loci ~6100
+# 11714/979442 = 1.2% missing data 
+
+missing.r95.perSNP <- colSums(is.na(gen.r95))
+quartz()
+hist(missing.r95.perSNP)
+
+
+gen.nomiss <- read.csv("EUSTallSNPr8.nomiss.012.csv", header=FALSE,sep="\t", na.strings="-1")
 sum(is.na(gen.nomiss))
 str(gen.nomiss)
+
 
 gen[1:20,1:20]
 
@@ -49,17 +66,6 @@ str(gen.imp)
 #gen.imp <- lapply(gen.imp, as.numeric(unlist(gen.imp[2:159,2:15038])))
 #str(gen.imp)
 
-# impute genotypes 
-library(radiator)
-library(grur)
-library(ranger)
-library(missRanger)
-#EUSTallSNPr8.imp.iv <- tidy_genomic_data(data = "EUSTallSNPr8.vcf", vcf.metadata = TRUE)
-#EUSTallSNPr8.imp.g <- grur_imputations(data = EUSTallSNPr8.imp.i, imputation.method = "max")
-#str(EUSTallSNPr8.imp.i)
-#tidy_genomic_data(EUSTallSNPr8.imp.g)
-#genomic_converter(EUSTallSNPr8.imp)
-
 #gen$Individual <- as.character(gen$Individual)
 gen.imp[,1:15038] <- lapply(gen.imp[,1:15038], as.numeric)
 gen.imp <- as.data.frame(gen.imp[2:159,])
@@ -73,7 +79,7 @@ gen.nomiss <- as.data.frame(gen.nomiss[2:159,])
 colnames(gen.nomiss) <- gsub("[a-zA-Z ]", "", colnames(gen.nomiss))
 head(gen.nomiss)
 str(gen.nomiss)
-sum(!is.na(gen.nomiss))
+sum(is.na(gen.nomiss))
 
 n.no <- nrow(gen.nomiss)
 p.no_0 <- apply(gen.nomiss, 2, function(x){sum(x == 0, na.rm = T)/(n - sum(is.na(x)))})
@@ -95,6 +101,17 @@ for (i in 1:nrow(NA_indices)) {
 env <- read.csv("EUSTrad.env.lessvar.csv")
 env.df <- as.data.frame(env)
 str(env.df)
+
+env.all <- read.csv("EUSTrad.env.csv")
+env.all <- as.data.frame(env.all)
+str(env.all)
+
+pdf("Supplement_AllBioclim.pdf",height=6,width=6)
+pairs.panels(env.all[,2:12])
+dev.off()
+
+
+
 pred <- env.df[,2:7]
 pred <- as.data.frame(lapply(pred, as.numeric))
 # remove BIO4 since not running

@@ -3,11 +3,17 @@ library(SNPRelate)
 library(gdsfmt)
 library(scales)
 library(ggplot2)
+library(hierfstat)
 
-setwd("~/Documents/starlingRAD/analysis")
+setwd("~/Documents/Ch2-NAm-RAD/analysis")
 
 ### TEST FOR MISSING DATA ###
 # convert SNPs to binary format (gdsfmt or Genomic Data Structure data files) - accelerates computation
+snpgdsVCF2GDS(vcf.fn="/Users/nataliehofmeister/Documents/Ch2-NAm-RAD/analysis/EUSTallSNPr8HWE.recode.vcf", out.fn="eustrad.hwe.gds",method = c("biallelic.only"),compress.annotation="ZIP.max", snpfirstdim=FALSE, verbose=TRUE)
+snpgdsSummary("eustrad.hwe.gds")
+genofile <- snpgdsOpen("eustrad.hwe.gds")
+# 14134 SNPs
+
 snpgdsVCF2GDS(vcf.fn="/Users/nataliehofmeister/Documents/starlingRAD/analysis/EUSTallSNPr8.nomiss.vcf.recode.vcf", out.fn="eustrad.nomiss.gds",method = c("biallelic.only"),compress.annotation="ZIP.max", snpfirstdim=FALSE, verbose=TRUE)
 snpgdsSummary("eustrad.nomiss.gds")
 genofile <- snpgdsOpen("eustrad.nomiss.gds")
@@ -67,7 +73,7 @@ dev.off()
 
 population<-c("west","west","west","west","west","west","west","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","west","west","west","west","west","west","west","west","west","west","east","east","east","east","east","east","east","east","east","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","west","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east","east")
 region <- c("Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southeast","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Southwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","West","West","West","West","West","West","West","West","West","West","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","Northwest","West","West","West","West","West","West","West","West","West","West","West","Mountain","Mountain","Mountain","Mountain","Mountain","Mountain","Mountain","Mountain","South","South","South","South","South","South","South","South","South","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Northeast","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest","Midwest")
-pcatab3 <- cbind(pcatab,region,realpop)
+pcatab3 <- cbind(pcatab,region)
 pcatab3
 
 # just east and west divisions
@@ -87,14 +93,16 @@ library(ade4)
 library(poppr)
 
 # make genind object
-genind<-read.structure("EUSToneSNPr8maf01p.stru",n.ind=158,n.loc=3570,onerowperind=FALSE,col.lab=1,col.pop=2,row.marknames=0,NA.char="-9",ask=FALSE,quiet=FALSE)
+
+
+genind<-read.structure("EUSToneSNPr8maf01p.str",n.ind=158,n.loc=3570,onerowperind=FALSE,col.lab=1,col.pop=2,row.marknames=0,NA.char="-9",ask=FALSE,quiet=FALSE)
 genind
 # check number of loci if not reading properly
-sum(!sapply(read.table("EUSToneSNPr8maf01p.stru", sep = "\t"), is.logical))
+sum(!sapply(read.table("EUSToneSNPr8maf01p.str", sep = "\t"), is.logical))
 # 3570
 
-genind.all<-read.structure("EUSTallSNPr8.stru",n.ind=158,n.loc=15040,onerowperind=FALSE,col.lab=1,col.pop=2,row.marknames=0,NA.char="-9",ask=FALSE,quiet=FALSE)
-genind.all
+genind<-read.structure("EUSTallSNPr8.stru",n.ind=158,n.loc=15040,onerowperind=FALSE,col.lab=1,col.pop=2,row.marknames=0,NA.char="-9",ask=FALSE,quiet=FALSE)
+genind
 
 sum(!sapply(read.table("EUSTallSNPr8.stru", sep = "\t"), is.logical))
 # 15040
@@ -126,6 +134,33 @@ table(strata(genind,~population))
 poppr(genind)
 
 ### Ready for analysis!
+
+
+### plotting missingness
+
+# out of 42791 alleles, how many are missing (-9 in .stru format)?
+genind.df<-read.csv("EUSTallSNPr8.stru", sep="\t")
+head(genind.df)
+colSums(genind.df = -9)
+
+
+################################## fst by pop ############################# 
+
+library(stargazer)
+hf.input <- genind2hierfstat(genind)
+
+
+# table of fst by population
+fst.table <- genet.dist(hf.input, method = "WC84")
+stargazer(fst.table[1:16,2:17], summary=FALSE, rownames=FALSE)
+write.csv(fst.table,"FST_EUSTallSNPr8.csv")
+
+loci <- hf.input[, -1] # Remove the population column
+varcomp.glob(levels = data.frame(samplingsite), loci, diploid = TRUE) 
+
+test.g(loci, level = population) 
+test.between(loci, test.lev = population, rand.unit = county, nperm = 100) 
+
 
 ################################## more pop gen ############################# 
 
@@ -271,19 +306,69 @@ scree.plot <- screeplot(genind.pca1,main="",npcs=25)
 ### Mantel test for IBD
 library(vegan)
 dist.geo <- dist(genind$other$xy)
-dist.genet <- dist(genind.X)
-mtest <- mantel(dist.genet, dist.geo)
-mtest
+dist.genet <- dist(genind)
+mtest <- mantel(dist.genet, dist.geo,method="spearman")
+mtest 
 
-plot(dist.geo,dist.genet,xlab="Spatial distance",ylab="Genetic distance")
+pdf("GenetvGeoDistance.pdf",h=5,w=5)
+plot(dist.geo,dist.genet,xlab="Geographic distance",ylab="Genetic distance", cex=0.8)
+dev.off()
 
-mantel.correlog <- mantel.correlog(dist(genind.X),D.geo=dist.geo,r.type="pearson", nperm=999)
+mantel.correlog <- mantel.correlog(dist(genind),D.geo=dist.geo,r.type="spearman", nperm=1000)
 mantel.correlog
 plot(mantel.correlog)
 
-mantel.correlog.more <- mantel.correlog(dist(genind.X),D.geo=dist.geo,r.type="pearson", nperm=99999)
+mantel.correlog.more <- mantel.correlog(dist(genind),D.geo=dist.geo,r.type="spearman", nperm=99999)
 mantel.correlog.more
 plot(mantel.correlog.more)
+
+#### plotting distribution of data
+hist(dist.geo)
+
+
+
+##### Partial Mantel for IBE vs IBD ##### 
+
+env <- read.csv("EUSTrad.env.csv")
+env.df <- as.data.frame(env)
+str(env.df)
+head(env.df)
+
+library(vegan)
+BIO1dist<-vegdist(env$BIO1, method="euclidean")
+BIO1dist
+
+BIO12dist<-vegdist(env$BIO12, method="euclidean")
+BIO12dist
+
+BIO16dist<-vegdist(env$BIO16, method="euclidean")
+BIO16dist
+
+BIO4dist<-vegdist(env$BIO4, method="euclidean")
+BIO4dist
+
+BIO7dist<-vegdist(env$BIO7, method="euclidean")
+BIO7dist
+
+elevdist<-vegdist(env$elevation, method="euclidean")
+elevdist
+
+
+
+#Mantel test for bioclim
+mantel.partial(dist.genet, BIO1dist, dist.geo, method="spearman", permutations = 999)
+mantel.partial(dist.genet, BIO12dist, dist.geo, method="spearman", permutations = 999)
+mantel.partial(dist.genet, BIO16dist, dist.geo, method="spearman", permutations = 999)
+mantel.partial(dist.genet, BIO4dist, dist.geo, method="spearman", permutations = 999)
+mantel.partial(dist.genet, BIO7dist, dist.geo, method="spearman", permutations = 999)
+
+#Mantel test for elevation
+mantel.partial(dist.genet, elevdist, dist.geo, method="spearman", permutations=999)
+
+
+### spatial autocorrelation
+library(geoR)
+
 
 ### AMOVA
 # run AMOVA on genind (genclone is haploid...)
